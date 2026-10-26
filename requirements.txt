@@ -1,7 +1,10 @@
-transformers==4.40.0
-numpy==1.26.4
-wandb==0.17.2
+# Prefer: pip install -e ".[mlx,demo,train]"   (see pyproject.toml)
+torch>=2.4
+numpy>=1.26
+safetensors>=0.4
 abctoolkit==0.0.6
 samplings==0.1.7
-pyparsing==3.2.1
-gradio==5.17.1
+pyparsing>=3.1
+mlx>=0.20; sys_platform == "darwin" and platform_machine == "arm64"
+gradio>=5
+wandb

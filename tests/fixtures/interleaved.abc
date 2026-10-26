@@ -1,0 +1,70 @@
+%Classical
+%Mozart, Wolfgang Amadeus
+%Keyboard
+%%score { 1 | 2 }
+L:1/8
+Q:1/4=120
+M:4/4
+K:G
+V:1 treble nm="Piano" snm="Pno."
+V:2 bass
+[V:1]bBaB CGdc|[V:2]G,,8|
+[V:1]cAeF dEGE||[V:2]G,,4 D,4||
+[V:1]aGdg aeEG|[V:2]G,,4 D,4|
+[V:1]bfAc dDAB||[V:2]D,2 F,2 A,4||
+[V:1]fFdc cbdG||[V:2]G,,4 D,4||
+[V:1]CDgb Bgba||[V:2]G,,4 D,4||
+[V:1]cbbA FgAg|[V:2]G,,4 D,4|
+[V:1]eFFa Eadc|[V:2]G,,4 D,4|
+[V:1]AdcD GdGg||[V:2]G,,4 D,4||
+[V:1]AbdF aede:|[V:2]D,2 F,2 A,4:|
+[V:1]DeaB AeFG|[V:2]C,8|
+[V:1]bECe fGcD|[V:2]G,,4 D,4|
+[V:1]ECbD gbdf||[V:2]G,,8||
+[V:1]GdaF bFfe||[V:2]G,,8||
+[V:1]Gccf fgaA|[V:2]G,,4 D,4|
+[V:1]eDce fAbF|[V:2]C,8|
+[V:1]gGDg FAaE:|[V:2]D,2 F,2 A,4:|
+[V:1]bCDa EbgF||[V:2]G,,4 D,4||
+[V:1]fdef DCDf||[V:2]C,8||
+[V:1]beDB DAbD||[V:2]G,,4 D,4||
+[V:1]CFEg DcFg|[V:2]G,,4 D,4|
+[V:1]dBeD bGDF|[V:2]G,,4 D,4|
+[V:1]ABEC dcCe:|[V:2]G,,4 D,4:|
+[V:1]FGAg cbeE|[V:2]C,8|
+[V:1]afEb EAdG||[V:2]G,,4 D,4||
+[V:1]cfEC cfBe|[V:2]D,2 F,2 A,4|
+[V:1]BbfG EdgC|[V:2]G,,8|
+[V:1]AgCd GEFa|[V:2]G,,8|
+[V:1]eGfA efbe|[V:2]C,8|
+[V:1]BgBb fDCe|[V:2]C,8|
+[V:1]EFFf cBgf|[V:2]G,,8|
+[V:1]Bbge Bafg|[V:2]G,,4 D,4|
+[V:1]cDGg Ecdc|[V:2]G,,4 D,4|
+[V:1]cAGb cCab|[V:2]G,,8|
+[V:1]dfDb gECB|[V:2]G,,8|
+[V:1]CFCg aCbf|[V:2]G,,4 D,4|
+[V:1]DefF bGGg|[V:2]C,8|
+[V:1]cbBf DCGc|[V:2]G,,4 D,4|
+[V:1]Efdb ffAD|[V:2]C,8|
+[V:1]bCCC FfGd|[V:2]D,2 F,2 A,4|
+[V:1]ebCb ggef:|[V:2]G,,8:|
+[V:1]fBAb dEFB|[V:2]D,2 F,2 A,4|
+[V:1]EEGA AaAg|[V:2]G,,4 D,4|
+[V:1]aeCC GEEe|[V:2]D,2 F,2 A,4|
+[V:1]BdEG DcgF|[V:2]G,,4 D,4|
+[V:1]Ebdg DGBb|[V:2]D,2 F,2 A,4|
+[V:1]BDDd ccAb|[V:2]D,2 F,2 A,4|
+[V:1]cDgc BCGA|[V:2]C,8|
+[V:1]feBa fDDa|[V:2]G,,4 D,4|
+[V:1]gFCB CDBd:|[V:2]D,2 F,2 A,4:|
+[V:1]caeg fFBD|[V:2]D,2 F,2 A,4|
+[V:1]GeaE BFAD|[V:2]G,,4 D,4|
+[V:1]dcaf FDcB|[V:2]D,2 F,2 A,4|
+[V:1]fCaF eEDF:|[V:2]G,,8:|
+[V:1]AdbE DecE:|[V:2]G,,8:|
+[V:1]dcfA bccf||[V:2]C,8||
+[V:1]eFCA ggAb|[V:2]D,2 F,2 A,4|
+[V:1]dEbG eaEb||[V:2]G,,8||
+[V:1]Ggga cDaD|[V:2]G,,4 D,4|
+[V:1]FECG Cabc|[V:2]D,2 F,2 A,4|

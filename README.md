@@ -38,13 +38,26 @@ Check our [demo page](https://electricalexis.github.io/notagen-demo/) and enjoy 
 ## ⚙️ Environment Setup
 
 ```bash
-conda create --name notagen python=3.10
-conda activate notagen
-conda install pytorch==2.3.0 pytorch-cuda=11.8 -c pytorch -c nvidia
-pip install accelerate
-pip install optimum
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate   # Python 3.10+
+pip install -e ".[mlx,demo,train]"                   # mlx installs only on Apple Silicon
 ```
+
+All stages now share one package (`notagen/`). The per-stage scripts below still work as before: edit the `config.py` in that folder and run the script from inside it. There is also a `notagen` command:
+
+```bash
+notagen generate --weights weights_notagenx_p_size_16_p_length_1024_p_layers_20_h_size_1280.pth \
+  --prompt "Romantic|Chopin, Frederic|Keyboard" --num-samples 8 --batch-size 8
+notagen convert <weights.pth> notagenx-mlx --to mlx --quantize 8   # Apple Silicon
+notagen train finetune --help
+```
+
+Changes from the original scripts:
+- generation uses a KV cache and batches pieces;
+- it runs natively with MLX on Apple Silicon;
+- weights can be stored as `safetensors`;
+- the LR warmup is now actually applied.
+
+See `docs/MODERNIZATION_ROADMAP.md` for benchmarks and every intended behaviour change.
 
 ## 🏋️ NotaGen Model Weights
 
