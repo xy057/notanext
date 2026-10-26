@@ -87,10 +87,10 @@ def main(argv=None):
     c.add_argument("--trust-pickle", action="store_true")
     c.set_defaults(fn=cmd_convert)
 
-    b = sub.add_parser("bench", help="generation throughput benchmark")
+    b = sub.add_parser("bench", help="generation throughput benchmark", add_help=False)
     b.set_defaults(fn=None)
 
-    t = sub.add_parser("train", help="pretrain / finetune / dpo (see notagen/train.py)")
+    t = sub.add_parser("train", help="pretrain / finetune / dpo (see notagen/train.py)", add_help=False)
     t.set_defaults(fn=None)
     for name, help_ in [
         ("eval", "generate for a prompt set; structure + CLaMP 2 report"),
