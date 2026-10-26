@@ -15,7 +15,7 @@ from notagen.infer import InferenceOptions, generate_for_demo, load  # noqa: E40
 from notagen.stage import model_config_from  # noqa: E402
 
 _opts = InferenceOptions(
-    weights=config.INFERENCE_WEIGHTS_PATH,
+    weights=os.environ.get("NOTAGEN_WEIGHTS", config.INFERENCE_WEIGHTS_PATH),
     backend=getattr(config, "BACKEND", "auto"),
     top_k=config.TOP_K,
     top_p=config.TOP_P,

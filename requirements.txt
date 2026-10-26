@@ -1,4 +1,4 @@
-# Prefer: pip install -e ".[mlx,demo,train]"   (see pyproject.toml)
+# Prefer: pip install -e ".[mlx,demo,train,clamp]"   (see pyproject.toml)
 torch>=2.4
 numpy>=1.26
 safetensors>=0.4
@@ -6,5 +6,8 @@ abctoolkit==0.0.6
 samplings==0.1.7
 pyparsing>=3.1
 mlx>=0.20; sys_platform == "darwin" and platform_machine == "arm64"
-gradio>=5
+gradio>=5,<6
+transformers>=4.40,<5
+huggingface-hub<1.0
+unidecode
 wandb

@@ -92,8 +92,29 @@ def main(argv=None):
 
     t = sub.add_parser("train", help="pretrain / finetune / dpo (see notagen/train.py)")
     t.set_defaults(fn=None)
+    for name, help_ in [
+        ("eval", "generate for a prompt set; structure + CLaMP 2 report"),
+        ("rl", "online RL from released weights with a CLaMP 2 reward"),
+        ("clamp2", "CLaMP 2 feature extraction / scoring"),
+        ("prefs", "build a CLaMP-DPO preference set (RL/data.py)"),
+        ("export", "package weights + model card for release"),
+        ("mlx-train", "LoRA fine-tune / DPO in MLX (Apple Silicon)"),
+    ]:
+        sub.add_parser(name, help=help_, add_help=False).set_defaults(fn=None)
 
     a, rest = ap.parse_known_args(argv)
+    passthrough = {
+        "eval": "evaluate",
+        "rl": "rl",
+        "clamp2": "clamp2",
+        "prefs": "prefs",
+        "export": "export",
+        "mlx-train": "mlx.train",
+    }
+    if a.cmd in passthrough:
+        import importlib
+
+        return importlib.import_module(f".{passthrough[a.cmd]}", __package__).main(rest)
     if a.cmd == "bench":
         from .bench import main as bench_main
 

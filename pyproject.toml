@@ -20,7 +20,8 @@ dependencies = [
 
 [project.optional-dependencies]
 mlx = ["mlx>=0.20; sys_platform == 'darwin' and platform_machine == 'arm64'"]
-demo = ["gradio>=5"]
+demo = ["gradio>=5,<6"]  # demo.py targets the Gradio 5 API
+clamp = ["transformers>=4.40,<5", "huggingface-hub<1.0", "unidecode"]  # CLaMP 2 (BERT + XLM-R) features/rewards
 train = ["wandb"]
 dev = ["pytest>=8", "ruff>=0.6", "transformers==4.40.0"]  # transformers only as the legacy test oracle
 
@@ -39,7 +40,7 @@ extend-exclude = ["data/abc2xml.py", "data/xml2abc.py", "gradio/abc2xml.py", "no
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = ["E741", "B905"]  # `l` for lines matches the legacy code; zips pair equal-length lists built together
+ignore = ["E741", "B905", "SIM115"]  # `l` for lines (legacy style); zips pair equal-length lists; long-lived log handles
 
 [tool.ruff.lint.per-file-ignores]
 "tests/legacy_ref/*" = ["ALL"]  # frozen pre-refactor oracles, intentionally unmodified

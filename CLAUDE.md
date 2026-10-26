@@ -27,6 +27,10 @@ uv pip install --python .venv/bin/python -e ".[mlx,demo,train,dev]"
   - `mlx/`: native MLX backend (`NotaGenMLX`, `MLXBackend`, `convert_to_mlx`, `load_mlx_model`). Conv1D weights are transposed to `nn.Linear` so `mlx.nn.quantize` works.
   - `sampling.py`: `TorchSampler` (on device) and `LegacySampler` (the original NumPy chain, bit-compatible with seeded legacy runs).
   - `train.py`: LM pre-train/fine-tune and DPOP trainers. `checkpoint.py`: legacy `.pth` ↔ `safetensors` + `config.json`. `metrics.py`, `abc.py` (rest restoration), `infer.py`, `bench.py`, `cli.py`.
+  - `clamp2.py`: CLaMP 2 encoder (same weights and feature semantics as `clamp2/extract_clamp2.py`, but batched, in memory, on any device). It needs only the CLaMP 2 checkpoint plus XLM-R's config/tokenizer in `weights/clamp2/`: XLM-R is built from config because the checkpoint overwrites its weights.
+  - `reward.py`: `Scorer` = structure checks + CLaMP 2 text fidelity (piece ↔ `prompt_text()`), optional reference fidelity (paper's CLaMP 2 score), and a within-group similarity penalty. Used by `evaluate.py` (`notagen eval`), `rl.py` (`notagen rl`) and `prefs.py` (`notagen prefs` = `RL/data.py`).
+  - `rl.py`: online group-relative RL from released weights. Dropout off, KL to the frozen start model, and a half-precision generation copy synced each step; `Generator(stream=False)` keeps each sampled piece as one sequence (`Piece.patches`).
+  - `mlx/train.py`: LoRA/QLoRA fine-tuning and DPO in MLX (`notagen mlx-train`); `NotaGenMLX.loss`/`sequence_logps` match the PyTorch values exactly. `export.py`: release folders with model cards (`notagen export`).
 - Stage dirs (`pretrain/`, `finetune/`, `RL/`, `inference/`, `gradio/`) are now **thin wrappers** that read their `config.py` and call the package. They no longer contain model code. `RL/data.py`, `data/*`, and `clamp2/*` are unchanged; `clamp2/utils.py` is unrelated (CLaMP 2 / M3 models).
 - `tests/legacy_ref/<stage>_utils.py`: frozen pre-refactor copies, used only as oracles. Don't edit them.
 
@@ -45,6 +49,12 @@ CLI (anywhere): `notagen generate|convert|bench|train`. Stage scripts still work
 | DPO training | `notagen train dpo --data-index ... --init-from ...` or `python train.py` (in `RL/`) | |
 | Convert weights | `notagen convert <src> <dst> [--to mlx --quantize 8]` | |
 | Throughput | `notagen bench --backend mlx --batch 1 8 32` | random weights |
+| CLaMP 2 features / score | `notagen clamp2 extract <abc_dir> <npy_dir>`, `notagen clamp2 score <gt> <gen>` | replaces `clamp2/*.py` |
+| Eval report | `notagen eval --weights <w> --n 8 [--reference <gt npy dir>] --out runs/eval` | 8 keyboard composers by default |
+| Preference set | `notagen prefs --interleaved ... --original ... (--gt-features DIR \| --prompt P) --out prefs.json` | replaces `RL/data.py` |
+| Online RL | `notagen rl --init-from <w> --steps 120 --lr 3e-6 --beta 0.04` | CLaMP 2 reward, no data needed |
+| MLX LoRA / DPO | `notagen mlx-train finetune\|dpo --init-from <w> ... [--quantize 4] [--fuse]` | Apple Silicon |
+| Release folders | `notagen export <w> --name notagenx [--report report.json]` | writes `weights/export/`, uploads nothing |
 | Demo | `python demo.py` (in `gradio/`) | weights path in `gradio/config.py` |
 
 Output folder names are unchanged (`output/{original,interleaved}/<weights stem>_k_{K}_p_{P}_temp_{T}`); feature extraction must use `interleaved/`, and `RL/data.py` uses both.
@@ -59,6 +69,10 @@ Output folder names are unchanged (`output/{original,interleaved}/<weights stem>
 - CLaMP-DPO (`RL/data.py`): ranks generated pieces by CLaMP 2 cosine similarity to the mean ground-truth feature, takes the top/bottom `data_select_portion`, and drops chosen pieces with misaligned bars, ungrouped staves of one instrument, or CLaMP 2 similarity > 0.95 to any training piece. The DPOP loss is `-logsigmoid(beta * (logits - lambda * max(0, ref_pos - pol_pos)))`; reference log-probs are now computed once up front.
 
 ## Gotchas
+
+- Real-weight tests skip unless their weights exist: `NOTAGEN_WEIGHTS=<NotaGen .pth>` for `test_real_weights.py`; `weights/clamp2/` (or `NOTAGEN_CLAMP2`) for `test_clamp2.py`.
+- Keep `huggingface-hub<1.0` and Gradio 5: Gradio 6 pulls in hub 2.x, which breaks the `transformers` 4.x that CLaMP 2 and the legacy oracle need.
+- `gradio/inference.py` takes `NOTAGEN_WEIGHTS` and `demo.py` takes `GRADIO_SERVER_NAME` (default `0.0.0.0`) from the environment.
 
 - Parity tests compare against the legacy model in fp32 on CPU. **MLX GPU fp32 matmuls are ~TF32 precision** (~1e-3 relative on M-series), so strict MLX parity tests run on `mx.cpu`.
 - The legacy LR schedules never applied (the scheduler was attached to an AdamW that was then replaced). The new trainer applies warmup; `schedule="constant"` reproduces the intended legacy behaviour.

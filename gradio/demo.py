@@ -71,7 +71,7 @@ def save_and_convert(abc_content, period, composer, instrumentation):
     xml_filename = f"{filename_base}.xml"
     try:
         subprocess.run(
-            ["python", "abc2xml.py", '-o', '.', abc_filename, ],
+            [sys.executable, "abc2xml.py", '-o', '.', abc_filename, ],
             check=True,
             capture_output=True,
             text=True
@@ -231,6 +231,6 @@ demo.css = css
 if __name__ == "__main__":
 
     demo.launch(
-        server_name="0.0.0.0",
+        server_name=os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0"),
         server_port=7861
     )

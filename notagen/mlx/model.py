@@ -37,10 +37,22 @@ class Attention(nn.Module):
         self.c_attn = nn.Linear(c, 3 * c)
         self.c_proj = nn.Linear(c, c)
 
-    def __call__(self, x, layer: int, view: CacheView):
+    def __call__(self, x, layer: int, view: CacheView | None, pad_mask=None):
         b, t, c = x.shape
         qkv = self.c_attn(x).reshape(b, t, 3, self.n_head, self.head_dim)
         q, k, v = qkv[:, :, 0], qkv[:, :, 1], qkv[:, :, 2]
+        if view is None:  # training: full causal attention, optional key padding mask [b, t]
+            mask = mx.tril(mx.ones((t, t), dtype=mx.bool_))[None]
+            if pad_mask is not None:
+                mask = mask & pad_mask.astype(mx.bool_)[:, None, :]
+            y = mx.fast.scaled_dot_product_attention(
+                q.transpose(0, 2, 1, 3),
+                k.transpose(0, 2, 1, 3),
+                v.transpose(0, 2, 1, 3),
+                scale=self.scale,
+                mask=mask[:, None] if mask.ndim == 3 else mask,
+            )
+            return self.c_proj(y.transpose(0, 2, 1, 3).reshape(b, t, c))
         cache = view.cache
         pos = view.start[:, None] + mx.arange(t)[None]  # [b,t]
         rows = view.rows if view.rows is not None else mx.arange(b)
@@ -79,8 +91,8 @@ class Block(nn.Module):
         self.ln_2 = nn.LayerNorm(cfg.hidden_size, eps=cfg.layer_norm_eps)
         self.mlp = MLP(cfg)
 
-    def __call__(self, x, layer, view):
-        x = x + self.attn(self.ln_1(x), layer, view)
+    def __call__(self, x, layer, view, pad_mask=None):
+        x = x + self.attn(self.ln_1(x), layer, view, pad_mask)
         return x + self.mlp(self.ln_2(x))
 
 
@@ -92,11 +104,12 @@ class GPT2(nn.Module):
         self.h = [Block(cfg) for _ in range(n_layers)]
         self.ln_f = nn.LayerNorm(cfg.hidden_size, eps=cfg.layer_norm_eps)
 
-    def __call__(self, inputs_embeds, view: CacheView):
+    def __call__(self, inputs_embeds, view: CacheView | None, pad_mask=None):
         t = inputs_embeds.shape[1]
-        x = inputs_embeds + self.wpe(view.start[:, None] + mx.arange(t)[None])
+        pos = mx.arange(t)[None] if view is None else view.start[:, None] + mx.arange(t)[None]
+        x = inputs_embeds + self.wpe(pos)
         for i, block in enumerate(self.h):
-            x = block(x, i, view)
+            x = block(x, i, view, pad_mask)
         return self.ln_f(x)
 
 
@@ -132,6 +145,34 @@ class NotaGenMLX(nn.Module):
 
     def embed_chars(self, ids):
         return self.char_decoder.wte(ids)
+
+    # ---- training (no cache) -----------------------------------------------------------------
+
+    def char_logps(self, patches, masks):
+        """Per-char log-probs for a right-padded batch. ``patches`` ``[b, n, patch_size]`` int,
+        ``masks`` ``[b, n]``. Returns ``(logps [b, n-1, ps], valid [b, n-1, ps])`` where row ``j``
+        scores patch ``j+1`` given patches ``0..j`` (the legacy left-shift), with fixed shapes."""
+        b, n, ps = patches.shape
+        h = self.patch_decoder(self.patch_embedding(patches), None, masks)  # [b, n, C]
+        enc = h[:, :-1].reshape(b * (n - 1), 1, -1)
+        tgt = patches[:, 1:].reshape(b * (n - 1), ps)
+        pair = (masks[:, :-1] * masks[:, 1:]).reshape(-1, 1)
+        x = mx.concatenate([enc, self.embed_chars(tgt)], axis=1)  # [bn, ps+1, C]
+        char_mask = mx.concatenate([mx.ones((tgt.shape[0], 1), dtype=tgt.dtype), (tgt != 0).astype(tgt.dtype)], axis=1)
+        logits = self.char_decoder.wte.as_linear(self.char_decoder(x, None, char_mask))[:, :-1].astype(mx.float32)
+        lp = mx.take_along_axis(nn.log_softmax(logits, axis=-1), tgt[..., None], axis=-1)[..., 0]
+        valid = (tgt != 0) & (pair > 0)
+        return lp.reshape(b, n - 1, ps), valid.reshape(b, n - 1, ps)
+
+    def loss(self, patches, masks):
+        """Mean next-char cross-entropy (same value as the PyTorch model's training loss)."""
+        lp, valid = self.char_logps(patches, masks)
+        v = valid.astype(mx.float32)
+        return -(lp * v).sum() / v.sum()
+
+    def sequence_logps(self, patches, masks):
+        lp, valid = self.char_logps(patches, masks)
+        return (lp * valid.astype(mx.float32)).sum(axis=(1, 2))
 
     def new_patch_cache(self, batch):
         c = self.cfg

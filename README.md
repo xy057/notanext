@@ -39,7 +39,7 @@ Check our [demo page](https://electricalexis.github.io/notagen-demo/) and enjoy 
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Python 3.10+
-pip install -e ".[mlx,demo,train]"                   # mlx installs only on Apple Silicon
+pip install -e ".[mlx,demo,train,clamp]"             # mlx installs only on Apple Silicon
 ```
 
 All stages now share one package (`notagen/`). The per-stage scripts below still work as before: edit the `config.py` in that folder and run the script from inside it. There is also a `notagen` command:
@@ -184,6 +184,19 @@ Here we give an example on how to use **CLaMP-DPO** to enhance the model fine-tu
 Download model weights and put them under the ```clamp2/```folder:
 - [CLaMP 2 Model Weights](https://huggingface.co/sander-wood/clamp2/blob/main/weights_clamp2_h_size_768_lr_5e-05_batch_128_scale_1_t_length_128_t_model_FacebookAI_xlm-roberta-base_t_dropout_True_m3_True.pth)
 - [M3 Model Weights](https://huggingface.co/sander-wood/clamp2/blob/main/weights_m3_p_size_64_p_length_512_t_layers_3_p_layers_12_h_size_768_lr_0.0001_batch_16_mask_0.45.pth)
+
+**With the `notagen` package** you don't need the M3 weights or the 1.1 GB XLM-RoBERTa weights (the CLaMP 2 checkpoint overwrites both). Put the CLaMP 2 checkpoint in `weights/clamp2/`, plus `config.json`, `tokenizer.json`, `tokenizer_config.json` and `sentencepiece.bpe.model` from [FacebookAI/xlm-roberta-base](https://huggingface.co/FacebookAI/xlm-roberta-base) in `weights/clamp2/xlm-roberta-base/`. Then, with no files to edit:
+
+```bash
+notagen clamp2 extract data/schubert_interleaved feature/schubert_interleaved   # = extract_clamp2.py
+notagen clamp2 score feature/schubert_interleaved feature/<generated>          # = statistics.py
+notagen prefs --interleaved output/interleaved/<run> --original output/original/<run> \
+  --gt-features feature/schubert_interleaved --out RL/prefs.json               # = RL/data.py
+notagen eval --weights <weights> --n 8                                         # structure + CLaMP 2 report
+notagen rl --init-from <weights> --steps 100                                   # online RL, CLaMP 2 reward
+```
+
+`notagen prefs --prompt` and `notagen rl` can also use CLaMP 2 text similarity to the prompt instead of ground-truth features, so they work without any training data.
 
 ### 🔍 Extract Ground Truth Features
 Modify ```input_dir``` and ```output_dir``` in ```clamp2/extract_clamp2.py```:

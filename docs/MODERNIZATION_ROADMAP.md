@@ -9,9 +9,12 @@ Written 2026-10-23 · Status updated 2026-10-26
 | 0 Baseline & harness | **Done** (random-weight fixtures) | 46 `pytest` tests. The pre-refactor `utils.py` copies are frozen in `tests/legacy_ref/` as oracles. Tokenizer output matches every stage variant, including random stream cuts. Loss, gradients, RL log-probs and char probabilities match legacy in fp32. Generation is identical to the legacy loop under seeded legacy sampling, and a scripted model drives the `[r:0/` hack, hundreds of re-seeds and EOS/limit endings through both. Metrics: alignment, stave grouping, diversity, near-copy rate. |
 | 1 One package | **Done** | `notagen/` + `pyproject.toml` + `notagen` CLI. Stage scripts are wrappers that keep their `config.py`. Legacy `.pth` load (`weights_only=True`) and `safetensors` round-trip. The released filenames all parse to the right presets. |
 | 2 Inference performance | **Done** | KV cache, on-device sampling, continuous batching, bf16/fp16, SDPA. Numbers below. |
-| 2b MLX backend | **Done** (inference). LoRA/DPO in MLX not started | Strict parity with PyTorch on MLX's CPU stream: greedy decoding exact, seeded legacy sampling exact. 8-bit conversion round-trips. |
+| 2b MLX backend | **Done**, including the LoRA/QLoRA/DPO stretch | Strict parity with PyTorch on MLX's CPU stream: greedy decoding exact, seeded legacy sampling exact. 8-bit conversion round-trips. The MLX training loss and sequence log-probs equal PyTorch's. LoRA starts as an exact identity, and fused weights reproduce the adapter outputs. LoRA and QLoRA fine-tuning lower eval loss, and MLX DPO raises the reward margin (`tests/test_mlx_train.py`). |
 | 3 Training infrastructure | **Done** | LR schedule fixed. torch.amp, clipping, fused AdamW, gradient checkpointing, exact resume, DataLoader workers, DPO with precomputed reference and batch > 1. Checked by tests and smoke runs: CPU, MPS bf16, 2-rank DDP (gloo). |
-| 4–6 | Not started | |
+| CLaMP 2 integration | **Done** | `notagen.clamp2` reproduces `clamp2/extract_clamp2.py` features (music, including multi-segment pieces, and text) to 1e-4. It runs batched on any device and replaces `extract_clamp2.py`, `statistics.py` and `RL/data.py` (`notagen clamp2`, `notagen prefs`). It needs no M3 weights or XLM-R weights. |
+| 4 Post-training (RL) | **Implemented and run** (results below) | Online group-relative RL with a composite reward: CLaMP 2 text fidelity + structure − within-group similarity, plus a KL penalty to the start model. The toy-reward test confirms learning. A 120-step run on NotaGen-X is reported below with before/after `notagen eval`. |
+| 5 Architecture v2 | Out of scope | Needs pre-training data. |
+| 6 Release | **Done locally** (nothing uploaded) | `notagen export`: fp32 `safetensors` that is bit-identical to the original (322/322 tensors), plus MLX bf16/8-bit/4-bit with model cards. The Gradio 5.50 demo was checked in a browser on the 4-bit MLX export, including generation and saving to ABC/MusicXML. |
 
 **Verified on released NotaGen-X weights** (`weights_notagenx_…_h_size_1280.pth`; SHA-256 `3df0bc38…4cff` matches the Hugging Face ETag; 515.9M params; loads with `weights_only=True`). Run with `NOTAGEN_WEIGHTS=<path> pytest tests/test_real_weights.py`:
 - forward loss and patch hidden states match the legacy model (fp32, CPU);
@@ -31,8 +34,32 @@ Written 2026-10-23 · Status updated 2026-10-26
 
 With 24 samples, a difference of 2–3 pieces is within sampling noise, so these structural metrics don't separate the configs. "Distinct bars" is the share of unique bar strings, a rough proxy for variety. The table can't detect musical-quality differences: that needs CLaMP 2 scores or listening, and neither has been done. `chars/s` is end-to-end at batch 8, including re-seeds and continuous-batching refills.
 
+**CLaMP 2 on NotaGen-X outputs.** CLaMP 2 identifies which of 3 very different prompts produced a piece with 90–100% accuracy (text query) and 100% accuracy (music-centroid kNN, n=120). On 10 keyboard composers, where the instrumentation is the same throughout, text-query retrieval for NotaGen-X is **38.8%**, against 10% chance (80 pieces).
+
+**Phase 4 run: online RL on NotaGen-X**:
+- 120 steps, groups of 8, lr 3e-6, KL weight 0.04;
+- reward = 4·text-sim + 0.5·aligned + 0.25·grouped − within-group similarity;
+- trained on 8 keyboard composers (Haydn and Schumann held out); about 75 minutes on the M5 Pro (MPS, bf16 autocast).
+
+Both evals use the same seeds (1234) and backend (MLX bf16), with 8 pieces per prompt:
+
+| metric (80 pieces) | NotaGen-X | after RL |
+|---|---|---|
+| finished / restored / grouped | 1.00 / 1.00 / 1.00 | 1.00 / 1.00 / 1.00 |
+| bars aligned | 0.925 | 0.900 |
+| CLaMP 2 text similarity | 0.117 | 0.135 |
+| CLaMP 2 retrieval accuracy (10 composers) | 0.388 (31/80) | 0.487 (39/80) |
+| diversity (1 − mean within-prompt cosine) | 0.364 | 0.356 |
+| KL per token at the end of training | – | ≈ 4e-4 |
+
+How to read this:
+- **The movement is in the intended direction but not statistically established.** Text similarity rose for 7 of the 10 prompts (paired t = 2.08 over prompts, df = 9; p ≈ 0.07). The retrieval gain is z = 1.28.
+- **The gain is on the training prompts only.** The 8 trained prompts gained +0.023 in text similarity; the 2 held-out prompts changed by −0.002.
+- **The judge is the reward.** CLaMP 2 is both the reward and the evaluator, so these numbers can't tell real musical improvement from learning what CLaMP 2 likes. Structure and diversity stayed within noise, so there's no sign of collapse.
+- **What would settle it:** a listening test, or the paper's ground-truth reference set (`--reference`, which also unlocks the paper's CLaMP 2 score), plus a longer run with more samples.
+
 **Not verified yet:**
-- CLaMP 2 scores, which need CLaMP 2 weights and ground-truth features;
+- the paper's CLaMP 2 score, which needs the ground-truth feature set (not public);
 - the "re-fine-tune matches the original loss curve" exit check;
 - CUDA runs. Everything here ran on an M5 Pro (64GB): CPU, MPS and MLX.
 
@@ -53,6 +80,7 @@ At batch 1 the PyTorch path is limited by kernel-launch overhead (about 116 smal
 - DPO reference log-probs are computed in eval mode. The legacy reference ran with dropout on.
 - DPO encodes each file once, so any stream cut is fixed per file instead of re-drawn for each pair.
 - The Gradio demo uses the batch re-seed. The old one raised `NameError` past 1024 patches.
+- The demo's "Save as ABC & XML" called a bare `python`, which doesn't exist on stock macOS or in an un-activated venv. It now uses the running interpreter.
 - `TorchSampler` drops the ~1e-10 probability that the legacy sampler leaked to filtered tokens. `--sampler legacy` keeps the old behaviour.
 
 ---

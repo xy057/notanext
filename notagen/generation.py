@@ -42,6 +42,7 @@ class Piece:
     seconds: float
     ok: bool
     reason: str = ""
+    patches: list[list[int]] | None = None  # full id history (prompt + sampled), when not re-seeded
 
 
 @dataclass
@@ -54,6 +55,7 @@ class _Row:
     pending: list[int] | None = None
     tunebody: bool = False
     cut_index: int | None = None
+    history: list[list[int]] | None = None
 
 
 class Generator:
@@ -64,12 +66,14 @@ class Generator:
         max_chars: int = 102400,
         time_limit: float = 20 * 60,
         on_text=None,
+        stream: bool = True,
     ):
         self.backend = backend
         self.tok = patchilizer
         self.max_chars = max_chars
         self.time_limit = time_limit
         self.on_text = on_text  # callback(row_index, text) for streaming output
+        self.stream = stream  # False: a piece that fills the context fails instead of re-seeding (RL)
 
     def generate(self, prompt_lines: list[str], num_pieces: int, batch_size: int = 1) -> Iterator[Piece]:
         """Yield ``num_pieces`` finished pieces (successful or failed) in completion order."""
@@ -83,7 +87,9 @@ class Generator:
         def launch(slot: int):
             nonlocal started
             b.prefill(slot, prompt)
-            rows[slot] = _Row(started, list("".join(prompt_lines)), len(prompt), time.time())
+            rows[slot] = _Row(
+                started, list("".join(prompt_lines)), len(prompt), time.time(), history=[list(p) for p in prompt]
+            )
             started += 1
 
         for slot in range(batch_size):
@@ -119,6 +125,8 @@ class Generator:
     def _advance(self, row: _Row, pred: list[int], slot: int) -> Piece | None:
         tok = self.tok
         if len(pred) >= 2 and pred[0] == BOS_ID and pred[1] == EOS_ID:
+            if row.history is not None:
+                row.history.append(row.prefix + [BOS_ID, EOS_ID] + [SPECIAL_ID] * (len(pred) - 2))
             return self._finish(row, True)
 
         text = tok.decode([pred])
@@ -136,6 +144,8 @@ class Generator:
         patch = row.prefix + pred
         row.prefix = []
         row.n_patches += 1
+        if row.history is not None:
+            row.history.append(list(patch))
 
         if len(row.chars) > self.max_chars:
             return self._finish(row, False, "max_chars")
@@ -143,6 +153,8 @@ class Generator:
             return self._finish(row, False, "time_limit")
 
         if row.n_patches >= tok.patch_length:
+            if not self.stream:
+                return self._finish(row, False, "context_full")
             return self._reseed(row, slot)
         row.pending = patch
         return None
@@ -175,12 +187,13 @@ class Generator:
         prefix = ids[-1] if len(ids[-1]) < self.tok.patch_size else []
         complete = ids[:-1] if prefix else ids
         self.backend.prefill(slot, complete)
+        row.history = None  # the context was rebuilt; the sampled history no longer is one sequence
         row.n_patches = len(complete)
         row.prefix = prefix
         return None
 
     def _finish(self, row: _Row, ok: bool, reason: str = "") -> Piece:
-        return Piece("".join(row.chars), time.time() - row.start_time, ok, reason)
+        return Piece("".join(row.chars), time.time() - row.start_time, ok, reason, row.history)
 
 
 class TorchBackend:

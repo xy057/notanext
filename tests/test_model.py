@@ -115,3 +115,16 @@ def test_legacy_pth_roundtrip(tmp_path, tiny_pair):
     assert m.cfg.patch_length == 48 and m.cfg.hidden_size == 128
     for k, v in new.state_dict().items():
         assert torch.equal(m.state_dict()[k], v), k
+
+
+def test_export_writes_model_cards(tmp_path, tiny_pair):
+    from notagen.checkpoint import load_model, save_model
+    from notagen.export import export
+
+    _, _, new = tiny_pair
+    src = save_model(new, tmp_path / "src")
+    outs = export(str(src), str(tmp_path / "out"), "tiny", "Tiny", "test", quantize=())
+    assert (outs[0] / "README.md").read_text().startswith("---\nlicense: mit")
+    m = load_model(outs[0])
+    for k, v in new.state_dict().items():
+        assert torch.equal(m.state_dict()[k], v)

@@ -231,6 +231,13 @@ class CharLevelDecoder(nn.Module):
         token_logps = logits.log_softmax(-1).gather(-1, target_patches[:, 1:, None]).squeeze(-1)
         return token_logps[target_masks[:, 1:] == 1].sum()
 
+    def token_logps(self, encoded_patches, target_patches):
+        """Per-char log-probabilities ``[n_patches, patch_size]`` and their validity mask (for RL)."""
+        target_patches, labels, target_masks, emb = self._inputs(encoded_patches, target_patches)
+        logits = self.base(emb, pad_mask=target_masks)[:, :-1].float()
+        token_logps = logits.log_softmax(-1).gather(-1, target_patches[:, 1:, None]).squeeze(-1)
+        return token_logps, target_masks[:, 1:].bool()
+
     def step(self, inputs_embeds, view: CacheView):
         return self.base(inputs_embeds, view=view)
 
@@ -266,6 +273,12 @@ class NotaGenLMHeadModel(nn.Module):
     def sequence_logps(self, patches, masks):
         encoded, targets = self._encode_for_targets(patches, masks)
         return self.char_level_decoder.sequence_logps(encoded, targets)
+
+    def token_logps(self, patches, masks):
+        """For one sequence: per-char log-probs of patches ``1..n-1`` given the preceding patches.
+        Returns ``(logps [n-1, patch_size], mask [n-1, patch_size])``."""
+        encoded, targets = self._encode_for_targets(patches, masks)
+        return self.char_level_decoder.token_logps(encoded, targets)
 
     # ---- generation primitives (used by notagen.generation.TorchBackend) ----
 
