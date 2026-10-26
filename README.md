@@ -42,6 +42,14 @@ python -m venv .venv && source .venv/bin/activate   # Python 3.10+
 pip install -e ".[mlx,demo,train,clamp]"             # mlx installs only on Apple Silicon
 ```
 
+**Quick start: the demo in one command.** Put the [NotaGen-X weights](https://huggingface.co/ElectricAlexis/NotaGen/blob/main/weights_notagenx_p_size_16_p_length_1024_p_layers_20_h_size_1280.pth) in `weights/`, then run:
+
+```bash
+python run.py --open
+```
+
+`run.py` finds the weights (it prefers a converted `weights/export/` folder from `notagen export`), uses MLX on Apple Silicon and PyTorch elsewhere, and serves on `127.0.0.1:7861`. Options: `--weights`, `--backend mlx|torch`, `--host 0.0.0.0` (serve on your network), `--port`.
+
 All stages now share one package (`notagen/`). The per-stage scripts below still work as before: edit the `config.py` in that folder and run the script from inside it. There is also a `notagen` command:
 
 ```bash

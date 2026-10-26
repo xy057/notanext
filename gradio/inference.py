@@ -14,13 +14,16 @@ import config  # noqa: E402
 from notagen.infer import InferenceOptions, generate_for_demo, load  # noqa: E402
 from notagen.stage import model_config_from  # noqa: E402
 
+_weights = os.environ.get("NOTAGEN_WEIGHTS", config.INFERENCE_WEIGHTS_PATH)
 _opts = InferenceOptions(
-    weights=os.environ.get("NOTAGEN_WEIGHTS", config.INFERENCE_WEIGHTS_PATH),
-    backend=getattr(config, "BACKEND", "auto"),
+    weights=_weights,
+    backend=os.environ.get("NOTAGEN_BACKEND", getattr(config, "BACKEND", "auto")),
+    dtype=os.environ.get("NOTAGEN_DTYPE", "auto"),
     top_k=config.TOP_K,
     top_p=config.TOP_P,
     temperature=config.TEMPERATURE,
-    model_config=model_config_from(config),
+    # config.py's sizes only describe a legacy .pth; converted folders carry their own config.json
+    model_config=model_config_from(config) if _weights.endswith(".pth") else None,
 )
 _backend = _tok = None
 
